@@ -27,6 +27,18 @@ import { callOnOne, checkActivatedClusters } from "src/utils/clusters";
 import { clusterNotFound } from "src/utils/errors";
 import { getClusterLoginNode, sshConnect } from "src/utils/ssh";
 
+// 解析内存字符串（如 "64G"、"64384M"、"1T"），统一转为 MB
+const parseMemoryToMb = (memory?: string): number | undefined => {
+  if (!memory) { return undefined; }
+  const match = /^([0-9]+(?:\.[0-9]+)?)\s*(K|M|G|T)?B?$/i.exec(memory.trim());
+  if (!match) { return undefined; }
+  const value = Number(match[1]);
+  const unit = (match[2] ?? "M").toUpperCase();
+  const factorMap: Record<string, number> = { K: 1 / 1024, M: 1, G: 1024, T: 1024 * 1024 };
+  const factor = factorMap[unit] ?? 1;
+  return Math.round(value * factor);
+};
+
 export const jobServiceServer = plugin((server) => {
 
   server.addService<JobServiceServer>(JobServiceService, {
@@ -260,7 +272,7 @@ export const jobServiceServer = plugin((server) => {
         logger,
         async (client) => await asyncClientCall(client.job, "submitJob", {
           userId, jobName, account, partition: partition, qos, nodeCount, gpuCount: gpuCount ?? 0,
-          memoryMb: Number(memory?.split("M")[0]), coreCount, timeLimitMinutes: maxTimeConversion,
+          memoryMb: parseMemoryToMb(memory), coreCount, timeLimitMinutes: maxTimeConversion,
           script: command, workingDirectory, stdout: output, stderr: errorOutput, extraOptions: [],
         }).catch((e) => {
           const ex = e as ServiceError;

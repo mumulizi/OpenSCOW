@@ -28,7 +28,6 @@ import { FileSelectModal } from "src/pageComponents/job/FileSelectModal";
 import { Partition } from "src/pages/api/cluster";
 import { ClusterInfoStore } from "src/stores/ClusterInfoStore";
 import { Cluster } from "src/utils/cluster";
-import { formatSize } from "src/utils/format";
 
 import { AccountListSelector } from "./AccountListSelector";
 import { PartitionSelector } from "./PartitionSelector";
@@ -39,6 +38,7 @@ interface JobForm {
   nodeCount: number;
   coreCount: number;
   gpuCount: number | undefined;
+  memory: number | undefined;
   command: string;
   jobName: string;
   qos: string | undefined;
@@ -70,6 +70,7 @@ const initialValues = {
   nodeCount: 1,
   coreCount: 1,
   gpuCount: 1,
+  memory: undefined,
   maxTime: 30,
   maxTimeUnit: TimeUnit.MINUTES,
   output: "job.%j.out",
@@ -98,18 +99,17 @@ export const SubmitJobForm: React.FC<Props> = ({ initial = initialValues, submit
   const cluster = Form.useWatch("cluster", form) as Cluster | undefined;
   const submit = async () => {
     const formValues = await form.validateFields();
-    const { cluster, command, jobName, coreCount, gpuCount, workingDirectory, output, errorOutput, save,
+    const { cluster, command, jobName, coreCount, gpuCount, memory, workingDirectory, output, errorOutput, save,
       maxTime, maxTimeUnit, nodeCount, partition, qos, account, comment, showScriptOutput } = formValues;
     const scriptOutput = showScriptOutput ? formValues.scriptOutput : "";
 
     await api.submitJob({
       body: {
         cluster: cluster.id, command, jobName, account,
-        coreCount: gpuCount ? gpuCount * Math.floor(currentPartitionInfo!.cores
-          / currentPartitionInfo!.gpus) : coreCount,
+        coreCount,
         gpuCount,
         maxTime, maxTimeUnit, nodeCount, partition, qos, comment,
-        workingDirectory, save, memory, output, errorOutput, scriptOutput,
+        workingDirectory, save, memory: memory ? `${memory}G` : undefined, output, errorOutput, scriptOutput,
       },
     })
       .httpError(500, (e) => {
@@ -370,14 +370,6 @@ export const SubmitJobForm: React.FC<Props> = ({ initial = initialValues, submit
     form.setFieldValue("qos", partitionInfo?.qos?.[0]);
   };
 
-  const memorySize = (currentPartitionInfo ?
-    currentPartitionInfo.gpus ? nodeCount * gpuCount
-      * Math.floor(currentPartitionInfo.cores / currentPartitionInfo.gpus)
-      * Math.floor(currentPartitionInfo.memMb / currentPartitionInfo.cores) :
-      nodeCount * coreCount * Math.floor(currentPartitionInfo.memMb / currentPartitionInfo.cores) : 0);
-  const memory = memorySize + "MB";
-  const memoryDisplay = formatSize(memorySize, ["MB", "GB", "TB"]);
-
   const coreCountSum = currentPartitionInfo?.gpus
     ? nodeCount * gpuCount * Math.floor(currentPartitionInfo.cores / currentPartitionInfo.gpus)
     : nodeCount * coreCount;
@@ -478,8 +470,8 @@ export const SubmitJobForm: React.FC<Props> = ({ initial = initialValues, submit
             />
           </Form.Item>
         </Col>
-        <Col span={12} sm={6}>
-          {currentPartitionInfo?.gpus ? (
+        {currentPartitionInfo?.gpus ? (
+          <Col span={12} sm={6}>
             <Form.Item
               label={t(p("gpuCount"))}
               name="gpuCount"
@@ -498,26 +490,29 @@ export const SubmitJobForm: React.FC<Props> = ({ initial = initialValues, submit
                 {...inputNumberFloorConfig}
               />
             </Form.Item>
-          ) : (
-            <Form.Item
-              label={t(p("coreCount"))}
-              name="coreCount"
-              dependencies={["cluster", "account", "partition"]}
-              rules={[
-                {
-                  required: true,
-                  type: "integer",
-                  max: currentPartitionInfo ? currentPartitionInfo.cores / currentPartitionInfo.nodes : undefined,
-                },
-              ]}
-            >
-              <InputNumber
-                min={1}
-                max={currentPartitionInfo ? currentPartitionInfo.cores / currentPartitionInfo.nodes : undefined}
-                {...inputNumberFloorConfig}
-              />
-            </Form.Item>
-          )}
+          </Col>
+        ) : (
+          ""
+        )}
+        <Col span={12} sm={6}>
+          <Form.Item
+            label={t(p("coreCount"))}
+            name="coreCount"
+            dependencies={["cluster", "account", "partition"]}
+            rules={[
+              {
+                required: true,
+                type: "integer",
+                max: currentPartitionInfo ? currentPartitionInfo.cores / currentPartitionInfo.nodes : undefined,
+              },
+            ]}
+          >
+            <InputNumber
+              min={1}
+              max={currentPartitionInfo ? currentPartitionInfo.cores / currentPartitionInfo.nodes : undefined}
+              {...inputNumberFloorConfig}
+            />
+          </Form.Item>
         </Col>
         <Col span={24} sm={6}>
           <Form.Item label={t(p("maxTime"))} required>
@@ -600,8 +595,21 @@ export const SubmitJobForm: React.FC<Props> = ({ initial = initialValues, submit
         <Col className="ant-form-item" span={12} sm={6}>
           {t(p("totalCoreCount"))}{coreCountSum}
         </Col>
-        <Col className="ant-form-item" span={12} sm={6}>
-          {t(p("totalMemory"))}{memoryDisplay}
+        <Col span={12} sm={6}>
+          <Form.Item
+            label={t(p("memory"))}
+            name="memory"
+            dependencies={["cluster", "account", "partition"]}
+            rules={[
+              { type: "number", min: 1 },
+            ]}
+          >
+            <InputNumber
+              min={1}
+              addonAfter="GB"
+              {...inputNumberFloorConfig}
+            />
+          </Form.Item>
         </Col>
       </Row>
       <Form.Item label={t(p("comment"))} name="comment">

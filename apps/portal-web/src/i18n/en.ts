@@ -180,6 +180,7 @@ export default {
         nodeCount: "Number of Nodes",
         gpuCount: "Number of GPU Cards per Node",
         coreCount: "Number of CPU Cores per Node",
+        memory: "Memory per Node",
         maxTime: "Maximum Running Time",
         requireMaxTime: "Please enter the maximum runtime",
         minute: "Minutes",

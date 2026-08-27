@@ -179,7 +179,7 @@ export default {
         qos: "QOS",
         nodeCount: "节点数",
         gpuCount: "单节点GPU卡数",
-        coreCount: "单节点核心数",
+        coreCount: "单节点CPU核心数",
         memory: "单节点内存",
         maxTime: "最长运行时间",
         requireMaxTime:"请输入最长运行时间",
